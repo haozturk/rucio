@@ -126,7 +126,7 @@ class PolicyPackageAlgorithms:
             env_name = 'RUCIO_POLICY_PACKAGE' + ('' if not vo else '_' + vo.upper())
             if env_name in os.environ:
                 package = os.environ[env_name]
-            if not package:
+            else:
                 package = str(config.config_get('policy', 'package' + ('' if not vo else '-' + vo)))
 
             check_policy_package_version(package)
