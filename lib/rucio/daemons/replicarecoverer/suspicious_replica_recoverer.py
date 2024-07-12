@@ -359,6 +359,7 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: "Op
         # Create rules only for replicas that can be declared bad.
         # Replicas from the auditor should be declared bad regardless of suspicious declarations, so no rules necessary.
         for rse_key in list(replicas_nattempts_1[vo].keys()):
+            logger(logging.DEBUG, "Starting rule creation")
             if not replicas_nattempts_1[vo][rse_key]:
                 # This is needed for testing purposes.
                 continue
@@ -372,6 +373,7 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: "Op
                 file_name = replicas_nattempts_1[vo][rse_key][replica_key]["name"]
                 file_metadata = get_metadata(file_scope, file_name)
                 replicas_nattempts_1[vo][rse_key][replica_key]["datatype"] = str(file_metadata["datatype"])
+                logger(logging.DEBUG, "Checking the following replica for rule creation with scope:name and file_metadata %s:%s %s", file_scope, file_name, file_metadata)
 
                 # Auditor
                 suspicious_reason = get_suspicious_reason(replicas_nattempts_1[vo][rse_key][replica_key]["rse_id"], file_scope, file_name, nattempts)
@@ -388,6 +390,7 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: "Op
                         files_to_be_declared_bad_nattempts_1.append(replicas_nattempts_1[vo][rse_key][replica_key])
                         action = ""
                     else:
+                        logger(logging.DEBUG, "Dealing with the replica based on their metadata")
                         # Deal with replicas based on their metadata.
                         if (file_metadata["datatype"] is None) and (use_file_metadata):  # "None" type has no function "split()"
                             logger(logging.WARNING, "RSE: %s, replica name %s, surl %s: Replica does not have a data type associated with it. No action will be taken.",
@@ -396,12 +399,16 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: "Op
                         file_metadata_datatype = str(file_metadata["datatype"])
                         if not use_file_metadata:
                             file_metadata_datatype = parse_replica_datatype(did_name_expression, file_name, rse_key, logger)
+                            logger(logging.DEBUG, "Using file_metadata_datatype from config %s", file_metadata_datatype)
                         file_metadata_scope = str(file_metadata["scope"])
                         action = ""
                         if file_metadata_datatype:
                             # Some files don't have a datatype. They should be ignored.
                             for policy in json_data:
+                                logger(logging.DEBUG, "Checking the following policy")
+                                logger(logging.DEBUG, str(policy))
                                 action = check_suspicious_policy(policy=policy, file_metadata_datatype=file_metadata_datatype, file_metadata_scope=file_metadata_scope)
+                                logger(logging.DEBUG, "Action is: %s", action)
                                 if action:
                                     logger(logging.INFO, "The action that will be performed is %s", action)
                                     break
