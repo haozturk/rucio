@@ -21,10 +21,10 @@ from flask import Flask, Response
 from rucio.common.exception import RequestNotFound
 from rucio.common.utils import APIEncoder, render_json
 from rucio.core.rse import get_rses_with_attribute_value
-from rucio.db.sqla.constants import RequestState
+from rucio.db.sqla.constants import RequestState, TransferLimitDirection
 from rucio.gateway import request
 from rucio.web.rest.flaskapi.authenticated_bp import AuthenticatedBlueprint
-from rucio.web.rest.flaskapi.v1.common import ErrorHandlingMethodView, check_accept_header_wrapper_flask, generate_http_error_flask, parse_scope_name, response_headers, try_stream
+from rucio.web.rest.flaskapi.v1.common import ErrorHandlingMethodView, check_accept_header_wrapper_flask, generate_http_error_flask, json_parameters, param_get, parse_scope_name, response_headers, try_stream
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -972,6 +972,148 @@ class RequestMetricsGet(ErrorHandlingMethodView):
                 yield render_json(**result) + '\n'
         return try_stream(generate())
 
+class TransferLimits(ErrorHandlingMethodView):
+    """ REST API to get transfer limits. """
+
+    # TODO: Check the sphinx documentation
+    @check_accept_header_wrapper_flask(['application/x-json-stream'])
+    def get(self):
+        """
+        ---
+        summary: Get Transfer Limits
+        description: Get all the transfer limits.
+        tags:
+          - Requests
+        responses:
+          200:
+            description: OK
+            content:
+              application/x-json-stream:
+                schema:
+                  description: All the transfer limits 
+                  type: object
+          401:
+            description: Invalid Auth Token
+        """
+        try:
+          transfer_limits = request.list_transfer_limits(issuer=flask.request.environ.get('issuer'))
+          import logging
+          logger = logging.getLogger(__name__)
+          logger.info(f"Transfer limits obtained")
+        ## TODO: Add the correct exception
+        except Exception as error:
+            return generate_http_error_flask(404, error.__class__.__name__, f'Transfer limits couldn\'t be retrieved: {str(error)}')
+
+        #return Response(json.dumps(transfer_limits, cls=APIEncoder), content_type='application/json')
+        #return try_stream(transfer_limits)
+        # TODO: Understand this
+        def generate():
+                for limit in transfer_limits:
+                    yield json.dumps(limit, cls=APIEncoder) + '\n'
+
+        return try_stream(generate())
+
+    # TODO: Check the sphinx documentation
+    @check_accept_header_wrapper_flask(['application/json']) # TODO: Check if this is necessary
+    def put(self):
+        """
+        ---
+        summary: Set Transfer Limit
+        description: Create or update a transfer limit for an RSE expression.
+        tags:
+          - Requests
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rse_expression:
+                    type: string
+                    description: RSE expression to set the limit for.
+                  activity:
+                    type: string
+                    description: The activity for which the limit applies.
+                  max_transfers:
+                    type: integer
+                    description: The maximum number of transfers allowed.
+                required:
+                  - rse_expression
+                  - activity
+                  - max_transfers
+        responses:
+          200:
+            description: Transfer limit set successfully.
+          400:
+            description: Invalid input data.
+          401:
+            description: Invalid Auth Token.
+          500:
+            description: Internal server error.
+        """
+        # TODO: Check the exception handling
+        parameters = json_parameters()
+        rse_expression = param_get(parameters, 'rse_expression')
+        max_transfers = param_get(parameters, 'max_transfers')
+
+        request.set_transfer_limit(
+          rse_expression=rse_expression,
+          max_transfers=max_transfers,
+          activity=param_get(parameters, 'activity', default=None),
+          direction=param_get(parameters, 'direction', default=TransferLimitDirection.DESTINATION),
+          volume=param_get(parameters, 'volume', default=None),
+          deadline=param_get(parameters, 'deadline', default=None),
+          strategy=param_get(parameters, 'strategy', default=None),
+          transfers=param_get(parameters, 'transfers', default=None),
+          waitings=param_get(parameters, 'waitings', default=None),
+          issuer=flask.request.environ.get('issuer'),
+          vo=flask.request.environ.get('vo')
+        )
+
+        # 200 or 201?
+        #return Response(json.dumps({'message': 'Transfer limit set successfully.'}), content_type='application/json', status=200) ## TODO ?
+        return '', 200
+
+    # TODO: Check the sphinx documentation
+    @check_accept_header_wrapper_flask(['application/json']) # TODO: Check if this is necessary
+    def delete(self):
+        """
+        ---
+        summary: Delete Transfer Limit
+        description: Delete a transfer limit for an RSE expression.
+        tags:
+          - Requests
+        parameters:
+          - name: rse_expression
+            in: query
+            description: The RSE expression to delete the limit for.
+            required: true
+            schema:
+              type: string
+        responses:
+          200:
+            description: Transfer limit deleted successfully.
+          400:
+            description: Invalid input data.
+          401:
+            description: Invalid Auth Token.
+          500:
+            description: Internal server error.
+        """
+        # TODO: Check the exception handling
+        parameters = json_parameters()
+        rse_expression = param_get(parameters, 'rse_expression')
+
+        request.delete_transfer_limit(
+          rse_expression=rse_expression,
+          activity=param_get(parameters, 'activity', default=None),
+          direction=param_get(parameters, 'direction', default=TransferLimitDirection.DESTINATION),
+          issuer=flask.request.environ.get('issuer'),
+          vo=flask.request.environ.get('vo')
+        )
+
+        return '', 200
 
 def blueprint():
     bp = AuthenticatedBlueprint('requests', __name__, url_prefix='/requests')
@@ -986,6 +1128,8 @@ def blueprint():
     bp.add_url_rule('/history/list', view_func=request_history_list_view, methods=['get', ])
     request_metrics_view = RequestMetricsGet.as_view('request_metrics_get')
     bp.add_url_rule('/metrics', view_func=request_metrics_view, methods=['get', ])
+    transfer_limits_view = TransferLimits.as_view('transfer_limits_get')
+    bp.add_url_rule('/transfer_limits', view_func=transfer_limits_view, methods=['get', 'put', 'delete'])
 
     bp.after_request(response_headers)
     return bp
