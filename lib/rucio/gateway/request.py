@@ -23,6 +23,7 @@ from rucio.common.types import InternalAccount, InternalScope, RequestGatewayDic
 from rucio.common.utils import gateway_update_return_dict
 from rucio.core import request
 from rucio.core.rse import get_rse_id
+from rucio.db.sqla.constants import TransferLimitDirection
 from rucio.db.sqla.session import read_session, stream_session, transactional_session
 from rucio.gateway import permission
 
@@ -328,3 +329,102 @@ def get_request_metrics(
         raise exception.AccessDenied(f'{issuer} cannot get request statistics. {auth_result.message}')
 
     return request.get_request_metrics(dest_rse_id=dst_rse_id, src_rse_id=src_rse_id, activity=activity, group_by_rse_attribute=group_by_rse_attribute, session=session)
+
+@read_session
+def list_transfer_limits(
+    issuer: str,
+    vo: str = 'def', ## TODO Check if this is needed
+    *,
+    session: "Session"
+) -> "Iterator[dict[str, Any]]": ## TODO check if this is true
+    """
+    List all the transfer limits.
+
+    :param issuer: Issuing account as a string.
+    :param session: The database session in use.
+    """
+    kwargs = {'issuer': issuer} # TODO check if this is needed
+    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='list_transfer_limits', kwargs=kwargs, session=session)
+    if not auth_result.allowed:
+        raise exception.AccessDenied(f'{issuer} cannot list transfer limits. {auth_result.message}')
+
+    return request.list_transfer_limits(session=session)
+
+@transactional_session
+def set_transfer_limit(
+    issuer: str,
+    rse_expression: str,
+    activity: Optional[str] = None,
+    direction: TransferLimitDirection = TransferLimitDirection.DESTINATION,
+    max_transfers: Optional[int] = None,
+    volume: Optional[int] = None,
+    deadline: Optional[int] = None,
+    strategy: Optional[str] = None,
+    transfers: Optional[int] = None,
+    waitings: Optional[int] = None,
+    vo: str = 'def',
+    *,
+    session: "Session"
+) -> 'uuid.UUID':
+    """
+    Create or update a transfer limit
+
+    :param issuer: Issuing account as a string.
+    :param vo: The VO to act on.
+    :param rse_expression: RSE expression string.
+    :param activity: The activity.
+    :param direction: The direction in which this limit applies (source/destination)
+    :param max_transfers: Maximum transfers.
+    :param volume: Maximum transfer volume in bytes.
+    :param deadline: Maximum waiting time in hours until a datasets gets released.
+    :param strategy: defines how to handle datasets: `fifo` (each file released separately) or `grouped_fifo` (wait for the entire dataset to fit)
+    :param transfers: Current number of active transfers
+    :param waitings: Current number of waiting transfers
+    :param session: The database session in use.
+
+    :return: the limit id
+    """
+    kwargs = {'issuer': issuer, 'rse_expression': rse_expression, 'activity': activity, 'max_transfers': max_transfers} # TODO check if this is needed
+    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='set_transfer_limit', kwargs=kwargs, session=session)
+    if not auth_result.allowed:
+        raise exception.AccessDenied(f'{issuer} cannot set transfer limits. {auth_result.message}')
+
+    request.set_transfer_limit(rse_expression=rse_expression,
+                               activity=activity,
+                               direction=direction,
+                               max_transfers=max_transfers,
+                               volume=volume,
+                               deadline=deadline,
+                               strategy=strategy,
+                               transfers=transfers,
+                               waitings=waitings)
+
+@transactional_session
+def delete_transfer_limit(
+    issuer: str,
+    rse_expression: str,
+    activity: Optional[str] = None,
+    direction: TransferLimitDirection = TransferLimitDirection.DESTINATION,
+    vo: str = 'def',
+    *,
+    session: "Session"
+) -> None:
+    """
+    Delete a transfer limit
+
+    :param issuer: Issuing account as a string.
+    :param vo: The VO to act on.
+    :param rse_expression: RSE expression string.
+    :param activity: The activity.
+    :param direction: The direction in which this limit applies (source/destination)
+    :param session: The database session in use.
+    """
+    kwargs = {'issuer': issuer, 'rse_expression': rse_expression, 'activity': activity} # TODO check if this is needed
+    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='delete_transfer_limit', kwargs=kwargs, session=session)
+    if not auth_result.allowed:
+        raise exception.AccessDenied(f'{issuer} cannot delete transfer limits. {auth_result.message}')
+
+    request.delete_transfer_limit(rse_expression=rse_expression,
+                                  activity=activity,
+                                  direction=direction,
+                                  session=session)
