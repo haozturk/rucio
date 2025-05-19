@@ -975,7 +975,6 @@ class RequestMetricsGet(ErrorHandlingMethodView):
 class TransferLimits(ErrorHandlingMethodView):
     """ REST API to get transfer limits. """
 
-    # TODO: Check the sphinx documentation
     @check_accept_header_wrapper_flask(['application/x-json-stream'])
     def get(self):
         """
@@ -991,59 +990,99 @@ class TransferLimits(ErrorHandlingMethodView):
               application/x-json-stream:
                 schema:
                   description: All the transfer limits 
-                  type: object
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        description: The transfer limit id.
+                        type: string
+                      rse_expression:
+                        description: The RSE expression for which the limit applies.
+                        type: string
+                      direction:
+                        description: The direction in which this limit applies (source/destination)
+                        type: string
+                      max_transfers:
+                        description: Maximum number of transfers allowed.
+                        type: integer
+                      volume:
+                        description: Maximum transfer volume in bytes.
+                        type: integer
+                      deadline:
+                        description: Maximum waiting time in hours until a datasets gets released.
+                        type: integer
+                      strategy:
+                        description: defines how to handle datasets: `fifo` (each file released separately) or `grouped_fifo` (wait for the entire dataset to fit)
+                        type: string
+                      transfers:
+                        description: Current number of active transfers
+                        type: integer
+                      waitings:
+                        description: Current number of waiting transfers
+                        type: integer
+                      updated_at:
+                        description: Datetime of the last update.
+                        type: string
+                      created_at:
+                        description: Datetime of the creation of the transfer limit.
+                        type: string
           401:
             description: Invalid Auth Token
         """
-        try:
-          transfer_limits = request.list_transfer_limits(issuer=flask.request.environ.get('issuer'))
-          import logging
-          logger = logging.getLogger(__name__)
-          logger.info(f"Transfer limits obtained")
-        ## TODO: Add the correct exception
-        except Exception as error:
-            return generate_http_error_flask(404, error.__class__.__name__, f'Transfer limits couldn\'t be retrieved: {str(error)}')
-
-        #return Response(json.dumps(transfer_limits, cls=APIEncoder), content_type='application/json')
-        #return try_stream(transfer_limits)
-        # TODO: Understand this
+        transfer_limits = request.list_transfer_limits(issuer=flask.request.environ.get('issuer'), vo=flask.request.environ.get('vo'))
         def generate():
                 for limit in transfer_limits:
                     yield json.dumps(limit, cls=APIEncoder) + '\n'
-
         return try_stream(generate())
 
-    # TODO: Check the sphinx documentation
-    @check_accept_header_wrapper_flask(['application/json']) # TODO: Check if this is necessary
     def put(self):
         """
         ---
         summary: Set Transfer Limit
-        description: Create or update a transfer limit for an RSE expression.
+        description: Create or update a transfer limit for a specific RSE expression and activity.
         tags:
           - Requests
         requestBody:
-          required: true
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - rse_expression
+                  - max_transfers
                 properties:
                   rse_expression:
                     type: string
-                    description: RSE expression to set the limit for.
+                    description: The RSE expression for which the transfer limit is being set.
                   activity:
                     type: string
-                    description: The activity for which the limit applies.
+                    description: The activity to which the transfer limit applies.
                   max_transfers:
                     type: integer
                     description: The maximum number of transfers allowed.
-                required:
-                  - rse_expression
-                  - activity
-                  - max_transfers
+                  direction:
+                    type: string
+                    description: The direction of the transfer limit (source or destination).
+                    enum: ["SOURCE", "DESTINATION"]
+                    default: "DESTINATION"
+                  volume:
+                    type: integer
+                    description: The maximum transfer volume in bytes.
+                  deadline:
+                    type: integer
+                    description: The maximum waiting time in hours until a dataset is released.
+                  strategy:
+                    type: string
+                    description: The strategy for handling datasets (e.g., `fifo` or `grouped_fifo`).
+                  transfers:
+                    type: integer
+                    description: The current number of active transfers.
+                  waitings:
+                    type: integer
+                    description: The current number of waiting transfers.
         responses:
-          200:
+          201:
             description: Transfer limit set successfully.
           400:
             description: Invalid input data.
@@ -1052,31 +1091,30 @@ class TransferLimits(ErrorHandlingMethodView):
           500:
             description: Internal server error.
         """
-        # TODO: Check the exception handling
         parameters = json_parameters()
         rse_expression = param_get(parameters, 'rse_expression')
         max_transfers = param_get(parameters, 'max_transfers')
 
-        request.set_transfer_limit(
-          rse_expression=rse_expression,
-          max_transfers=max_transfers,
-          activity=param_get(parameters, 'activity', default=None),
-          direction=param_get(parameters, 'direction', default=TransferLimitDirection.DESTINATION),
-          volume=param_get(parameters, 'volume', default=None),
-          deadline=param_get(parameters, 'deadline', default=None),
-          strategy=param_get(parameters, 'strategy', default=None),
-          transfers=param_get(parameters, 'transfers', default=None),
-          waitings=param_get(parameters, 'waitings', default=None),
-          issuer=flask.request.environ.get('issuer'),
-          vo=flask.request.environ.get('vo')
-        )
+        try:
+          request.set_transfer_limit(
+            rse_expression=rse_expression,
+            max_transfers=max_transfers,
+            activity=param_get(parameters, 'activity', default=None),
+            direction=param_get(parameters, 'direction', default=TransferLimitDirection.DESTINATION),
+            volume=param_get(parameters, 'volume', default=None),
+            deadline=param_get(parameters, 'deadline', default=None),
+            strategy=param_get(parameters, 'strategy', default=None),
+            transfers=param_get(parameters, 'transfers', default=None),
+            waitings=param_get(parameters, 'waitings', default=None),
+            issuer=flask.request.environ.get('issuer'),
+            vo=flask.request.environ.get('vo')
+          )
+        except AccessDenied as error:
+          return generate_http_error_flask(401, error)
 
-        # 200 or 201?
-        #return Response(json.dumps({'message': 'Transfer limit set successfully.'}), content_type='application/json', status=200) ## TODO ?
-        return '', 200
+        return '', 201
 
     # TODO: Check the sphinx documentation
-    @check_accept_header_wrapper_flask(['application/json']) # TODO: Check if this is necessary
     def delete(self):
         """
         ---
@@ -1101,17 +1139,19 @@ class TransferLimits(ErrorHandlingMethodView):
           500:
             description: Internal server error.
         """
-        # TODO: Check the exception handling
         parameters = json_parameters()
         rse_expression = param_get(parameters, 'rse_expression')
 
-        request.delete_transfer_limit(
-          rse_expression=rse_expression,
-          activity=param_get(parameters, 'activity', default=None),
-          direction=param_get(parameters, 'direction', default=TransferLimitDirection.DESTINATION),
-          issuer=flask.request.environ.get('issuer'),
-          vo=flask.request.environ.get('vo')
-        )
+        try:
+          request.delete_transfer_limit(
+            rse_expression=rse_expression,
+            activity=param_get(parameters, 'activity', default=None),
+            direction=param_get(parameters, 'direction', default=TransferLimitDirection.DESTINATION),
+            issuer=flask.request.environ.get('issuer'),
+            vo=flask.request.environ.get('vo')
+          )
+        except AccessDenied as error:
+          return generate_http_error_flask(401, error)
 
         return '', 200
 

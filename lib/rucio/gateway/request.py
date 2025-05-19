@@ -333,18 +333,17 @@ def get_request_metrics(
 @read_session
 def list_transfer_limits(
     issuer: str,
-    vo: str = 'def', ## TODO Check if this is needed
+    vo: str = 'def',
     *,
     session: "Session"
-) -> "Iterator[dict[str, Any]]": ## TODO check if this is true
+) -> "Iterator[dict[str, Any]]":
     """
     List all the transfer limits.
 
     :param issuer: Issuing account as a string.
     :param session: The database session in use.
     """
-    kwargs = {'issuer': issuer} # TODO check if this is needed
-    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='list_transfer_limits', kwargs=kwargs, session=session)
+    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='list_transfer_limits', kwargs={}, session=session)
     if not auth_result.allowed:
         raise exception.AccessDenied(f'{issuer} cannot list transfer limits. {auth_result.message}')
 
@@ -371,8 +370,8 @@ def set_transfer_limit(
 
     :param issuer: Issuing account as a string.
     :param vo: The VO to act on.
-    :param rse_expression: RSE expression string.
-    :param activity: The activity.
+    :param rse_expression: RSE expression for which the transfer limit applies.
+    :param activity: The activity for which the transfer limit applies.
     :param direction: The direction in which this limit applies (source/destination)
     :param max_transfers: Maximum transfers.
     :param volume: Maximum transfer volume in bytes.
@@ -384,20 +383,20 @@ def set_transfer_limit(
 
     :return: the limit id
     """
-    kwargs = {'issuer': issuer, 'rse_expression': rse_expression, 'activity': activity, 'max_transfers': max_transfers} # TODO check if this is needed
+    kwargs = {'rse_expression': rse_expression, 'activity': activity, 'max_transfers': max_transfers}
     auth_result = permission.has_permission(issuer=issuer, vo=vo, action='set_transfer_limit', kwargs=kwargs, session=session)
     if not auth_result.allowed:
         raise exception.AccessDenied(f'{issuer} cannot set transfer limits. {auth_result.message}')
 
-    request.set_transfer_limit(rse_expression=rse_expression,
-                               activity=activity,
-                               direction=direction,
-                               max_transfers=max_transfers,
-                               volume=volume,
-                               deadline=deadline,
-                               strategy=strategy,
-                               transfers=transfers,
-                               waitings=waitings)
+    return request.set_transfer_limit(rse_expression=rse_expression,
+                                      activity=activity,
+                                      direction=direction,
+                                      max_transfers=max_transfers,
+                                      volume=volume,
+                                      deadline=deadline,
+                                      strategy=strategy,
+                                      transfers=transfers,
+                                      waitings=waitings)
 
 @transactional_session
 def delete_transfer_limit(
@@ -414,12 +413,12 @@ def delete_transfer_limit(
 
     :param issuer: Issuing account as a string.
     :param vo: The VO to act on.
-    :param rse_expression: RSE expression string.
-    :param activity: The activity.
+    :param rse_expression: RSE expression for which the transfer limit applies.
+    :param activity: The activity for which the transfer limit applies.
     :param direction: The direction in which this limit applies (source/destination)
     :param session: The database session in use.
     """
-    kwargs = {'issuer': issuer, 'rse_expression': rse_expression, 'activity': activity} # TODO check if this is needed
+    kwargs = {'rse_expression': rse_expression, 'activity': activity} # TODO check if this is needed
     auth_result = permission.has_permission(issuer=issuer, vo=vo, action='delete_transfer_limit', kwargs=kwargs, session=session)
     if not auth_result.allowed:
         raise exception.AccessDenied(f'{issuer} cannot delete transfer limits. {auth_result.message}')

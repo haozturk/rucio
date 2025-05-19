@@ -131,7 +131,7 @@ class RequestClient(BaseClient):
     ) -> 'Iterator[dict[str, Any]]':
         """Returns all the transfer limits
 
-        :return: transfer limits
+        :returns: transfer limits
         """
         path = '/'.join([self.REQUEST_BASEURL, 'transfer_limits'])
         url = build_url(choice(self.list_hosts), path=path)
@@ -166,8 +166,8 @@ class RequestClient(BaseClient):
         :param strategy: defines how to handle datasets: `fifo` (each file released separately) or `grouped_fifo` (wait for the entire dataset to fit)
         :param transfers: Current number of active transfers
         :param waitings: Current number of waiting transfers
-        :param session: The database session in use.
-        :raises exc_cls: from BaseClient._get_exception # TODO Check if this is correct
+        
+        :returns: True if the transfer limit was deleted
         """
         path = '/'.join([self.REQUEST_BASEURL, 'transfer_limits'])
         url = build_url(choice(self.list_hosts), path=path)
@@ -176,7 +176,7 @@ class RequestClient(BaseClient):
                 'transfers': transfers, 'waitings': waitings})
         r = self._send_request(url, type_='PUT', data=data)
 
-        if r.status_code == codes.ok:
+        if r.status_code == codes.created:
             return True
         exc_cls, exc_msg = self._get_exception(headers=r.headers, status_code=r.status_code, data=r.content)
         raise exc_cls(exc_msg)
@@ -192,8 +192,8 @@ class RequestClient(BaseClient):
         :param rse_expression: RSE expression string.
         :param activity: The activity.
         :param direction: The direction in which this limit applies (source/destination)
-        :raises exc_cls: from BaseClient._get_exception # TODO Check if this is correct
-        :return: True if the transfer limit was deleted # TODO Check if this is correct
+
+        :returns: True if the transfer limit was deleted
         """
         path = '/'.join([self.REQUEST_BASEURL, 'transfer_limits'])
         url = build_url(choice(self.list_hosts), path=path)
