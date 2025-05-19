@@ -976,7 +976,7 @@ class TransferLimits(ErrorHandlingMethodView):
     """ REST API to get transfer limits. """
 
     @check_accept_header_wrapper_flask(['application/x-json-stream'])
-    def get(self):
+    def get(self) -> flask.Response:
         """
         ---
         summary: Get Transfer Limits
@@ -1031,12 +1031,12 @@ class TransferLimits(ErrorHandlingMethodView):
             description: Invalid Auth Token
         """
         transfer_limits = request.list_transfer_limits(issuer=flask.request.environ.get('issuer'), vo=flask.request.environ.get('vo'))
-        def generate():
+        def generate() -> "Iterator[str]":
                 for limit in transfer_limits:
                     yield json.dumps(limit, cls=APIEncoder) + '\n'
         return try_stream(generate())
 
-    def put(self):
+    def put(self) -> tuple[str, int]:
         """
         ---
         summary: Set Transfer Limit
@@ -1114,8 +1114,7 @@ class TransferLimits(ErrorHandlingMethodView):
 
         return '', 201
 
-    # TODO: Check the sphinx documentation
-    def delete(self):
+    def delete(self) -> tuple[str, int]:
         """
         ---
         summary: Delete Transfer Limit
