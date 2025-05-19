@@ -418,7 +418,7 @@ def delete_transfer_limit(
     :param direction: The direction in which this limit applies (source/destination)
     :param session: The database session in use.
     """
-    kwargs = {'rse_expression': rse_expression, 'activity': activity} # TODO check if this is needed
+    kwargs = {'rse_expression': rse_expression, 'activity': activity}
     auth_result = permission.has_permission(issuer=issuer, vo=vo, action='delete_transfer_limit', kwargs=kwargs, session=session)
     if not auth_result.allowed:
         raise exception.AccessDenied(f'{issuer} cannot delete transfer limits. {auth_result.message}')
