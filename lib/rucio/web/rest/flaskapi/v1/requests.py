@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import flask
 from flask import Flask, Response
 
-from rucio.common.exception import RequestNotFound
+from rucio.common.exception import AccessDenied, RequestNotFound
 from rucio.common.utils import APIEncoder, render_json
 from rucio.core.rse import get_rses_with_attribute_value
 from rucio.db.sqla.constants import RequestState, TransferLimitDirection
@@ -1036,7 +1036,7 @@ class TransferLimits(ErrorHandlingMethodView):
                     yield json.dumps(limit, cls=APIEncoder) + '\n'
         return try_stream(generate())
 
-    def put(self) -> tuple[str, int]:
+    def put(self) -> Union[flask.Response, tuple[str, int]]:
         """
         ---
         summary: Set Transfer Limit
@@ -1114,7 +1114,7 @@ class TransferLimits(ErrorHandlingMethodView):
 
         return '', 201
 
-    def delete(self) -> tuple[str, int]:
+    def delete(self) -> Union[flask.Response, tuple[str, int]]:
         """
         ---
         summary: Delete Transfer Limit

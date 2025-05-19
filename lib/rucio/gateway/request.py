@@ -364,7 +364,7 @@ def set_transfer_limit(
     vo: str = 'def',
     *,
     session: "Session"
-) -> 'uuid.UUID':
+) -> None:
     """
     Create or update a transfer limit
 
@@ -388,15 +388,15 @@ def set_transfer_limit(
     if not auth_result.allowed:
         raise exception.AccessDenied(f'{issuer} cannot set transfer limits. {auth_result.message}')
 
-    return request.set_transfer_limit(rse_expression=rse_expression,
-                                      activity=activity,
-                                      direction=direction,
-                                      max_transfers=max_transfers,
-                                      volume=volume,
-                                      deadline=deadline,
-                                      strategy=strategy,
-                                      transfers=transfers,
-                                      waitings=waitings)
+    request.set_transfer_limit(rse_expression=rse_expression,
+                               activity=activity,
+                               direction=direction,
+                               max_transfers=max_transfers,
+                               volume=volume,
+                               deadline=deadline,
+                               strategy=strategy,
+                               transfers=transfers,
+                               waitings=waitings)
 
 @transactional_session
 def delete_transfer_limit(
