@@ -989,7 +989,7 @@ class TransferLimits(ErrorHandlingMethodView):
             content:
               application/x-json-stream:
                 schema:
-                  description: All the transfer limits 
+                  description: All the transfer limits
                   type: array
                   items:
                     type: object
