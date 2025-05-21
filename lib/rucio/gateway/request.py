@@ -23,8 +23,8 @@ from rucio.common.types import InternalAccount, InternalScope, RequestGatewayDic
 from rucio.common.utils import gateway_update_return_dict
 from rucio.core import request
 from rucio.core.rse import get_rse_id
-from rucio.db.sqla.constants import TransferLimitDirection
-from rucio.db.sqla.session import read_session, stream_session, transactional_session
+from rucio.db.sqla.constants import DatabaseOperationType, TransferLimitDirection
+from rucio.db.sqla.session import db_session, read_session, stream_session, transactional_session
 from rucio.gateway import permission
 
 if TYPE_CHECKING:
@@ -330,26 +330,25 @@ def get_request_metrics(
 
     return request.get_request_metrics(dest_rse_id=dst_rse_id, src_rse_id=src_rse_id, activity=activity, group_by_rse_attribute=group_by_rse_attribute, session=session)
 
-@read_session
 def list_transfer_limits(
     issuer: str,
-    vo: str = 'def',
-    *,
-    session: "Session"
+    vo: str = 'def'
 ) -> "Iterator[dict[str, Any]]":
     """
     List all the transfer limits.
 
     :param issuer: Issuing account as a string.
     :param session: The database session in use.
+
+    :returns: The list of transfer limits
     """
-    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='list_transfer_limits', kwargs={}, session=session)
-    if not auth_result.allowed:
-        raise exception.AccessDenied(f'{issuer} cannot list transfer limits. {auth_result.message}')
+    with db_session(DatabaseOperationType.READ) as session:
+        auth_result = permission.has_permission(issuer=issuer, vo=vo, action='list_transfer_limits', kwargs={}, session=session)
+        if not auth_result.allowed:
+            raise exception.AccessDenied(f'{issuer} cannot list transfer limits. {auth_result.message}')
 
-    return request.list_transfer_limits(session=session)
+        return request.list_transfer_limits(session=session)
 
-@transactional_session
 def set_transfer_limit(
     issuer: str,
     rse_expression: str,
@@ -361,9 +360,7 @@ def set_transfer_limit(
     strategy: Optional[str] = None,
     transfers: Optional[int] = None,
     waitings: Optional[int] = None,
-    vo: str = 'def',
-    *,
-    session: "Session"
+    vo: str = 'def'
 ) -> None:
     """
     Create or update a transfer limit
@@ -381,32 +378,30 @@ def set_transfer_limit(
     :param waitings: Current number of waiting transfers
     :param session: The database session in use.
 
-    :return: the limit id
+    :returns: None
     """
-    kwargs = {'rse_expression': rse_expression, 'activity': activity, 'max_transfers': max_transfers}
-    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='set_transfer_limit', kwargs=kwargs, session=session)
-    if not auth_result.allowed:
-        raise exception.AccessDenied(f'{issuer} cannot set transfer limits. {auth_result.message}')
+    with db_session(DatabaseOperationType.WRITE) as session:
+        kwargs = {'rse_expression': rse_expression, 'activity': activity, 'max_transfers': max_transfers}
+        auth_result = permission.has_permission(issuer=issuer, vo=vo, action='set_transfer_limit', kwargs=kwargs, session=session)
+        if not auth_result.allowed:
+            raise exception.AccessDenied(f'{issuer} cannot set transfer limits. {auth_result.message}')
 
-    request.set_transfer_limit(rse_expression=rse_expression,
-                               activity=activity,
-                               direction=direction,
-                               max_transfers=max_transfers,
-                               volume=volume,
-                               deadline=deadline,
-                               strategy=strategy,
-                               transfers=transfers,
-                               waitings=waitings)
+        request.set_transfer_limit(rse_expression=rse_expression,
+                                activity=activity,
+                                direction=direction,
+                                max_transfers=max_transfers,
+                                volume=volume,
+                                deadline=deadline,
+                                strategy=strategy,
+                                transfers=transfers,
+                                waitings=waitings)
 
-@transactional_session
 def delete_transfer_limit(
     issuer: str,
     rse_expression: str,
     activity: Optional[str] = None,
     direction: TransferLimitDirection = TransferLimitDirection.DESTINATION,
-    vo: str = 'def',
-    *,
-    session: "Session"
+    vo: str = 'def'
 ) -> None:
     """
     Delete a transfer limit
@@ -418,12 +413,13 @@ def delete_transfer_limit(
     :param direction: The direction in which this limit applies (source/destination)
     :param session: The database session in use.
     """
-    kwargs = {'rse_expression': rse_expression, 'activity': activity}
-    auth_result = permission.has_permission(issuer=issuer, vo=vo, action='delete_transfer_limit', kwargs=kwargs, session=session)
-    if not auth_result.allowed:
-        raise exception.AccessDenied(f'{issuer} cannot delete transfer limits. {auth_result.message}')
+    with db_session(DatabaseOperationType.WRITE) as session:
+        kwargs = {'rse_expression': rse_expression, 'activity': activity}
+        auth_result = permission.has_permission(issuer=issuer, vo=vo, action='delete_transfer_limit', kwargs=kwargs, session=session)
+        if not auth_result.allowed:
+            raise exception.AccessDenied(f'{issuer} cannot delete transfer limits. {auth_result.message}')
 
-    request.delete_transfer_limit(rse_expression=rse_expression,
-                                  activity=activity,
-                                  direction=direction,
-                                  session=session)
+        request.delete_transfer_limit(rse_expression=rse_expression,
+                                    activity=activity,
+                                    direction=direction,
+                                    session=session)

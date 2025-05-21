@@ -973,7 +973,7 @@ class RequestMetricsGet(ErrorHandlingMethodView):
         return try_stream(generate())
 
 class TransferLimits(ErrorHandlingMethodView):
-    """ REST API to get transfer limits. """
+    """ REST API to get, set or delete transfer limits. """
 
     @check_accept_header_wrapper_flask(['application/x-json-stream'])
     def get(self) -> flask.Response:
