@@ -1030,7 +1030,7 @@ class TransferLimits(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
         """
-        transfer_limits = request.list_transfer_limits(issuer=flask.request.environ.get('issuer'), vo=flask.request.environ.get('vo'))
+        transfer_limits = request.list_transfer_limits(issuer=flask.request.environ['issuer'], vo=flask.request.environ['vo'])
         def generate() -> "Iterator[str]":
                 for limit in transfer_limits:
                     yield json.dumps(limit, cls=APIEncoder) + '\n'
@@ -1106,8 +1106,8 @@ class TransferLimits(ErrorHandlingMethodView):
             strategy=param_get(parameters, 'strategy', default=None),
             transfers=param_get(parameters, 'transfers', default=None),
             waitings=param_get(parameters, 'waitings', default=None),
-            issuer=flask.request.environ.get('issuer'),
-            vo=flask.request.environ.get('vo')
+            issuer=flask.request.environ['issuer'],
+            vo=flask.request.environ['vo']
           )
         except AccessDenied as error:
           return generate_http_error_flask(401, error)
@@ -1146,8 +1146,8 @@ class TransferLimits(ErrorHandlingMethodView):
             rse_expression=rse_expression,
             activity=param_get(parameters, 'activity', default=None),
             direction=param_get(parameters, 'direction', default=TransferLimitDirection.DESTINATION),
-            issuer=flask.request.environ.get('issuer'),
-            vo=flask.request.environ.get('vo')
+            issuer=flask.request.environ['issuer'],
+            vo=flask.request.environ['vo']
           )
         except AccessDenied as error:
           return generate_http_error_flask(401, error)
